@@ -43,11 +43,13 @@
             background: #0ff;
             color: #000;
         }
+        .stats { font-size: 18px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
 
     <div id="ui">
+        <div class="stats" id="highScore">Best: 0</div>
         <h1 id="score">Score: 0</h1>
         <div id="msg"></div>
         <button id="restartBtn" onclick="resetGame()">Restart</button>
@@ -58,6 +60,7 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
+const highScoreEl = document.getElementById('highScore');
 const restartBtn = document.getElementById('restartBtn');
 
 // Настройки экрана
@@ -70,7 +73,11 @@ const JUMP_FORCE = -10;
 const GROUND_Y = canvas.height - 50;
 const GAME_SPEED = 5;
 
+// Загрузка рекорда (сохранение между сессиями)
 let score = 0;
+let highScore = localStorage.getItem('neonDashHighScore') || 0;
+highScoreEl.innerText = `Best: ${highScore}`;
+
 let gameActive = true;
 let obstacles = [];
 let frameCount = 0;
@@ -87,7 +94,6 @@ const player = {
     color: '#00fbff'
 };
 
-// Обработка ввода
 window.addEventListener('keydown', (e) => { if (e.code === 'Space') jump(); });
 window.addEventListener('touchstart', jump);
 window.addEventListener('mousedown', jump);
@@ -96,20 +102,19 @@ function jump() {
     if (player.isGrounded && gameActive) {
         player.dy = JUMP_FORCE;
         player.isGrounded = false;
-        // Поворот на 90 градусов при каждом прыжке
         player.targetRotation += Math.PI / 2;
     }
 }
 
 function spawnObstacle() {
-    const type = Math.random() > 0.4 ? 'spike' : 'block';
+    // Теперь создаем только шипы
     obstacles.push({
         x: canvas.width + 50,
-        y: type === 'spike' ? GROUND_Y : GROUND_Y - 40,
+        y: GROUND_Y,
         w: 30,
-        h: type === 'spike' ? 30 : 40,
-        type: type,
-        color: type === 'spike' ? '#ff0055' : '#ffea00'
+        h: 30,
+        type: 'spike',
+        color: '#ff0055' // Красный цвет опасности
     });
 }
 
@@ -117,32 +122,26 @@ function drawPlayer() {
     ctx.save();
     ctx.translate(player.x + player.w / 2, player.y + player.h / 2);
     
-    // Плавная интерполяция вращения
     if (player.rotation < player.targetRotation) {
         player.rotation += 0.1;
         if (player.rotation > player.targetRotation) player.rotation = player.targetRotation;
     }
     
     ctx.rotate(player.rotation);
-    
-    // Неоновое свечение
     ctx.shadowBlur = 15;
     ctx.shadowColor = player.color;
     ctx.fillStyle = player.color;
     ctx.fillRect(-player.w / 2, -player.h / 2, player.w, player.h);
     
-    // Внутренний контур для стиля
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.strokeRect(-player.w / 2 + 5, -player.h / 2 + 5, player.w - 10, player.h - 10);
-    
     ctx.restore();
 }
 
 function update() {
     if (!gameActive) return;
 
-    // Физика игрока
     player.dy += GRAVITY;
     player.y += player.dy;
 
@@ -150,24 +149,22 @@ function update() {
         player.y = GROUND_Y - player.h;
         player.dy = 0;
         player.isGrounded = true;
-        // Приземление: докручиваем до ближайшего угла 90 градусов
         player.rotation = player.targetRotation;
     }
 
-    // Генерация препятствий
-    if (frameCount % 80 === 0) spawnObstacle();
+    // Генерация препятствий (только шипы)
+    if (frameCount % 90 === 0) spawnObstacle();
     frameCount++;
 
-    // Обновление препятствий
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let obs = obstacles[i];
         obs.x -= GAME_SPEED;
 
-        // Коллизия (AABB)
-        if (player.x < obs.x + obs.w &&
-            player.x + player.w > obs.x &&
-            player.y < obs.y + obs.h &&
-            player.y + player.h > obs.y) {
+        // Коллизия (улучшена для треугольников)
+        if (player.x < obs.x + obs.w - 5 &&
+            player.x + player.w > obs.x + 5 &&
+            player.y < obs.y &&
+            player.y + player.h > obs.y - obs.h) {
             gameOver();
         }
 
@@ -180,11 +177,10 @@ function update() {
 }
 
 function draw() {
-    // Очистка фона
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Рисуем "пол" (неоновая линия)
+    // Пол
     ctx.beginPath();
     ctx.moveTo(0, GROUND_Y);
     ctx.lineTo(canvas.width, GROUND_Y);
@@ -197,22 +193,18 @@ function draw() {
     ctx.strokeStyle = '#0ff';
     ctx.strokeRect(-10, GROUND_Y, canvas.width + 20, 2);
 
-    // Рисуем препятствия
+    // Отрисовка шипов
     obstacles.forEach(obs => {
         ctx.shadowBlur = 15;
         ctx.shadowColor = obs.color;
         ctx.fillStyle = obs.color;
         
-        if (obs.type === 'spike') {
-            ctx.beginPath();
-            ctx.moveTo(obs.x, obs.y);
-            ctx.lineTo(obs.x + obs.w, obs.y);
-            ctx.lineTo(obs.x + obs.w / 2, obs.y - obs.h);
-            ctx.closePath();
-            ctx.fill();
-        } else {
-            ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-        }
+        ctx.beginPath();
+        ctx.moveTo(obs.x, obs.y);
+        ctx.lineTo(obs.x + obs.w, obs.y);
+        ctx.lineTo(obs.x + obs.w / 2, obs.y - obs.h);
+        ctx.closePath();
+        ctx.fill();
     });
 
     drawPlayer();
@@ -221,7 +213,14 @@ function draw() {
 function gameOver() {
     gameActive = false;
     restartBtn.style.display = 'block';
-    document.getElementById('msg').innerHTML = "<h2 style='color:#ff0055'>GAME OVER</h2>";
+    document.getElementById('msg').innerHTML = "<h2 style='color:#ff0055'>FATAL ERROR</h2>";
+    
+    // Сохраняем рекорд, если текущий счет больше
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('neonDashHighScore', highScore);
+        highScoreEl.innerText = `Best: ${highScore}`;
+    }
 }
 
 function resetGame() {
