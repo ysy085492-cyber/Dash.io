@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Neon Dash JS</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0a0a0a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            border: 2px solid #333;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+        }
+        #ui {
+            position: absolute;
+            text-align: center;
+            color: #fff;
+            pointer-events: none;
+            user-select: none;
+        }
+        #restartBtn {
+            margin-top: 20px;
+            padding: 10px 25px;
+            font-size: 20px;
+            background: transparent;
+            color: #0ff;
+            border: 2px solid #0ff;
+            cursor: pointer;
+            pointer-events: auto;
+            display: none;
+            transition: 0.3s;
+            text-transform: uppercase;
+            box-shadow: 0 0 10px #0ff;
+        }
+        #restartBtn:hover {
+            background: #0ff;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <h1 id="score">Score: 0</h1>
+        <div id="msg"></div>
+        <button id="restartBtn" onclick="resetGame()">Restart</button>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const restartBtn = document.getElementById('restartBtn');
+
+// Настройки экрана
+canvas.width = 800;
+canvas.height = 400;
+
+// Игровые константы
+const GRAVITY = 0.6;
+const JUMP_FORCE = -10;
+const GROUND_Y = canvas.height - 50;
+const GAME_SPEED = 5;
+
+let score = 0;
+let gameActive = true;
+let obstacles = [];
+let frameCount = 0;
+
+const player = {
+    x: 100,
+    y: GROUND_Y - 30,
+    w: 30,
+    h: 30,
+    dy: 0,
+    rotation: 0,
+    targetRotation: 0,
+    isGrounded: false,
+    color: '#00fbff'
+};
+
+// Обработка ввода
+window.addEventListener('keydown', (e) => { if (e.code === 'Space') jump(); });
+window.addEventListener('touchstart', jump);
+window.addEventListener('mousedown', jump);
+
+function jump() {
+    if (player.isGrounded && gameActive) {
+        player.dy = JUMP_FORCE;
+        player.isGrounded = false;
+        // Поворот на 90 градусов при каждом прыжке
+        player.targetRotation += Math.PI / 2;
+    }
+}
+
+function spawnObstacle() {
+    const type = Math.random() > 0.4 ? 'spike' : 'block';
+    obstacles.push({
+        x: canvas.width + 50,
+        y: type === 'spike' ? GROUND_Y : GROUND_Y - 40,
+        w: 30,
+        h: type === 'spike' ? 30 : 40,
+        type: type,
+        color: type === 'spike' ? '#ff0055' : '#ffea00'
+    });
+}
+
+function drawPlayer() {
+    ctx.save();
+    ctx.translate(player.x + player.w / 2, player.y + player.h / 2);
+    
+    // Плавная интерполяция вращения
+    if (player.rotation < player.targetRotation) {
+        player.rotation += 0.1;
+        if (player.rotation > player.targetRotation) player.rotation = player.targetRotation;
+    }
+    
+    ctx.rotate(player.rotation);
+    
+    // Неоновое свечение
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = player.color;
+    ctx.fillStyle = player.color;
+    ctx.fillRect(-player.w / 2, -player.h / 2, player.w, player.h);
+    
+    // Внутренний контур для стиля
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-player.w / 2 + 5, -player.h / 2 + 5, player.w - 10, player.h - 10);
+    
+    ctx.restore();
+}
+
+function update() {
+    if (!gameActive) return;
+
+    // Физика игрока
+    player.dy += GRAVITY;
+    player.y += player.dy;
+
+    if (player.y + player.h >= GROUND_Y) {
+        player.y = GROUND_Y - player.h;
+        player.dy = 0;
+        player.isGrounded = true;
+        // Приземление: докручиваем до ближайшего угла 90 градусов
+        player.rotation = player.targetRotation;
+    }
+
+    // Генерация препятствий
+    if (frameCount % 80 === 0) spawnObstacle();
+    frameCount++;
+
+    // Обновление препятствий
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        let obs = obstacles[i];
+        obs.x -= GAME_SPEED;
+
+        // Коллизия (AABB)
+        if (player.x < obs.x + obs.w &&
+            player.x + player.w > obs.x &&
+            player.y < obs.y + obs.h &&
+            player.y + player.h > obs.y) {
+            gameOver();
+        }
+
+        if (obs.x + obs.w < 0) {
+            obstacles.splice(i, 1);
+            score++;
+            scoreEl.innerText = `Score: ${score}`;
+        }
+    }
+}
+
+function draw() {
+    // Очистка фона
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Рисуем "пол" (неоновая линия)
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    ctx.lineTo(canvas.width, GROUND_Y);
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#0ff';
+    ctx.strokeStyle = '#0ff';
+    ctx.strokeRect(-10, GROUND_Y, canvas.width + 20, 2);
+
+    // Рисуем препятствия
+    obstacles.forEach(obs => {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = obs.color;
+        ctx.fillStyle = obs.color;
+        
+        if (obs.type === 'spike') {
+            ctx.beginPath();
+            ctx.moveTo(obs.x, obs.y);
+            ctx.lineTo(obs.x + obs.w, obs.y);
+            ctx.lineTo(obs.x + obs.w / 2, obs.y - obs.h);
+            ctx.closePath();
+            ctx.fill();
+        } else {
+            ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+        }
+    });
+
+    drawPlayer();
+}
+
+function gameOver() {
+    gameActive = false;
+    restartBtn.style.display = 'block';
+    document.getElementById('msg').innerHTML = "<h2 style='color:#ff0055'>GAME OVER</h2>";
+}
+
+function resetGame() {
+    score = 0;
+    scoreEl.innerText = `Score: 0`;
+    obstacles = [];
+    player.y = GROUND_Y - 30;
+    player.dy = 0;
+    player.rotation = 0;
+    player.targetRotation = 0;
+    gameActive = true;
+    restartBtn.style.display = 'none';
+    document.getElementById('msg').innerHTML = "";
+    requestAnimationFrame(gameLoop);
+}
+
+function gameLoop() {
+    update();
+    draw();
+    if (gameActive) requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
