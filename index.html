@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -13,10 +14,15 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            /* Отключаем системные жесты, чтобы не было задержек */
+            touch-action: none;
         }
         canvas {
             border: 2px solid #333;
             box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+            /* Убираем задержку тапа и выделение на мобилках */
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
         }
         #ui {
             position: absolute;
@@ -82,7 +88,7 @@ const GROUND_Y = canvas.height - 50;
 let score = 0;
 let level = 1;
 let gameSpeed = 5;
-let spawnRate = 90; // Каждые сколько кадров спавнить шип
+let spawnRate = 90;
 let highScore = localStorage.getItem('neonDashHighScore') || 0;
 highScoreEl.innerText = `Best: ${highScore}`;
 
@@ -104,10 +110,11 @@ const player = {
 
 const levelColors = ['#ff0055', '#ff8800', '#77ff00', '#00ffcc', '#cc00ff'];
 
-window.addEventListener('keydown', (e) => { if (e.code === 'Space') jump(); });
-window.addEventListener('mousedown', jump);
-
-function jump() {
+// --- УПРАВЛЕНИЕ БЕЗ ЗАДЕРЖЕК ---
+function jump(e) {
+    if (e) {
+        if (e.cancelable) e.preventDefault();
+    }
     if (player.isGrounded && gameActive) {
         player.dy = JUMP_FORCE;
         player.isGrounded = false;
@@ -115,16 +122,28 @@ function jump() {
     }
 }
 
+// Слушаем клавиши
+window.addEventListener('keydown', (e) => { 
+    if (e.code === 'Space' || e.code === 'ArrowUp') jump(e); 
+});
+
+// Слушаем тач (для мобилок) - мгновенная реакция
+canvas.addEventListener('touchstart', jump, { passive: false });
+
+// Слушаем клик (для ПК)
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0) jump(e);
+});
+// -------------------------------
+
 function updateDifficulty() {
-    // Повышаем уровень каждые 10 очков
     let newLevel = Math.floor(score / 10) + 1;
     if (newLevel > level) {
         level = newLevel;
-        gameSpeed += 0.8; // Увеличиваем скорость
-        spawnRate = Math.max(40, 90 - (level * 5)); // Шипы появляются чаще
+        gameSpeed += 0.8;
+        spawnRate = Math.max(40, 90 - (level * 5));
         levelEl.innerText = `Level: ${level}`;
         
-        // Кратковременный эффект вспышки при переходе уровня
         ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
@@ -160,7 +179,6 @@ function update() {
         let obs = obstacles[i];
         obs.x -= gameSpeed;
 
-        // Коллизия
         if (player.x < obs.x + obs.w - 5 &&
             player.x + player.w > obs.x + 5 &&
             player.y + player.h > obs.y - obs.h) {
@@ -180,7 +198,6 @@ function draw() {
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Пол
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -188,7 +205,6 @@ function draw() {
     ctx.lineTo(canvas.width, GROUND_Y);
     ctx.stroke();
 
-    // Отрисовка препятствий
     obstacles.forEach(obs => {
         ctx.shadowBlur = 15;
         ctx.shadowColor = obs.color;
@@ -200,7 +216,6 @@ function draw() {
         ctx.fill();
     });
 
-    // Отрисовка игрока
     ctx.save();
     ctx.translate(player.x + player.w / 2, player.y + player.h / 2);
     if (player.rotation < player.targetRotation) player.rotation += 0.15;
