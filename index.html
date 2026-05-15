@@ -1,270 +1,114 @@
-
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Neon Dash: Levels</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Зі святом, бабусю Надіє!</title>
     <style>
         body {
             margin: 0;
-            overflow: hidden;
-            background-color: #0a0a0a;
-            font-family: 'Segoe UI', sans-serif;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7e2 100%);
+            color: #4a4a4a;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            /* Отключаем системные жесты, чтобы не было задержек */
-            touch-action: none;
+            min-height: 100vh;
         }
-        canvas {
-            border: 2px solid #333;
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
-            /* Убираем задержку тапа и выделение на мобилках */
-            touch-action: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-        #ui {
-            position: absolute;
+
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            max-width: 600px;
             text-align: center;
-            color: #fff;
-            pointer-events: none;
+            margin: 20px;
+            border: 2px solid #fbb6ce;
         }
-        .stats-container {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            margin-bottom: 10px;
+
+        h1 {
+            color: #d53f8c;
+            font-size: 2.5em;
+            margin-bottom: 20px;
         }
-        #restartBtn {
-            margin-top: 20px;
-            padding: 12px 30px;
-            font-size: 18px;
-            background: none;
-            color: #0ff;
-            border: 2px solid #0ff;
-            cursor: pointer;
-            pointer-events: auto;
-            display: none;
-            text-transform: uppercase;
-            box-shadow: 0 0 15px #0ff;
+
+        .name {
+            font-style: italic;
+            color: #b83280;
         }
-        #levelText {
-            color: #ffea00;
+
+        p {
+            line-height: 1.6;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+
+        .decoration {
+            font-size: 40px;
+            margin: 20px 0;
+        }
+
+        .wishes {
+            text-align: left;
+            background: #fff5f7;
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 5px solid #fbb6ce;
+        }
+
+        footer {
+            margin-top: 30px;
             font-weight: bold;
-            text-shadow: 0 0 10px #ffea00;
+            color: #d53f8c;
+        }
+
+        .btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 25px;
+            background-color: #d53f8c;
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            transition: 0.3s;
+        }
+
+        .btn:hover {
+            background-color: #b83280;
+            transform: scale(1.05);
         }
     </style>
 </head>
 <body>
 
-    <div id="ui">
-        <div class="stats-container">
-            <div id="highScore">Best: 0</div>
-            <div id="levelText">Level: 1</div>
-        </div>
-        <h1 id="score">Score: 0</h1>
-        <div id="msg"></div>
-        <button id="restartBtn" onclick="resetGame()">Try Again</button>
-    </div>
-    <canvas id="gameCanvas"></canvas>
-
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const scoreEl = document.getElementById('score');
-const highScoreEl = document.getElementById('highScore');
-const levelEl = document.getElementById('levelText');
-const restartBtn = document.getElementById('restartBtn');
-
-canvas.width = 800;
-canvas.height = 400;
-
-const GRAVITY = 0.6;
-const JUMP_FORCE = -10;
-const GROUND_Y = canvas.height - 50;
-
-// Игровое состояние
-let score = 0;
-let level = 1;
-let gameSpeed = 5;
-let spawnRate = 90;
-let highScore = localStorage.getItem('neonDashHighScore') || 0;
-highScoreEl.innerText = `Best: ${highScore}`;
-
-let gameActive = true;
-let obstacles = [];
-let frameCount = 0;
-
-const player = {
-    x: 100,
-    y: GROUND_Y - 30,
-    w: 30,
-    h: 30,
-    dy: 0,
-    rotation: 0,
-    targetRotation: 0,
-    isGrounded: false,
-    color: '#00fbff'
-};
-
-const levelColors = ['#ff0055', '#ff8800', '#77ff00', '#00ffcc', '#cc00ff'];
-
-// --- УПРАВЛЕНИЕ БЕЗ ЗАДЕРЖЕК ---
-function jump(e) {
-    if (e) {
-        if (e.cancelable) e.preventDefault();
-    }
-    if (player.isGrounded && gameActive) {
-        player.dy = JUMP_FORCE;
-        player.isGrounded = false;
-        player.targetRotation += Math.PI / 2;
-    }
-}
-
-// Слушаем клавиши
-window.addEventListener('keydown', (e) => { 
-    if (e.code === 'Space' || e.code === 'ArrowUp') jump(e); 
-});
-
-// Слушаем тач (для мобилок) - мгновенная реакция
-canvas.addEventListener('touchstart', jump, { passive: false });
-
-// Слушаем клик (для ПК)
-canvas.addEventListener('mousedown', (e) => {
-    if (e.button === 0) jump(e);
-});
-// -------------------------------
-
-function updateDifficulty() {
-    let newLevel = Math.floor(score / 10) + 1;
-    if (newLevel > level) {
-        level = newLevel;
-        gameSpeed += 0.8;
-        spawnRate = Math.max(40, 90 - (level * 5));
-        levelEl.innerText = `Level: ${level}`;
+    <div class="card">
+        <div class="decoration">🌸✨🌸</div>
+        <h1>Зі святом, дорога бабусю <span class="name">Надіє</span>!</h1>
         
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-}
+        <p>
+            Хоч ми з Вами й двоюрідні за родинним деревом, але за теплом та повагою — Ви для мене дуже близька людина. 
+            Ваше ім'я символізує те, що Ви даруєте кожному з нас: віру в краще та світло у душі.
+        </p>
 
-function spawnObstacle() {
-    obstacles.push({
-        x: canvas.width + 50,
-        y: GROUND_Y,
-        w: 30,
-        h: 30,
-        color: levelColors[(level - 1) % levelColors.length]
-    });
-}
+        <div class="wishes">
+            <p><strong>Від усього серця бажаю Вам:</strong></p>
+            <ul>
+                <li>Міцного-міцного здоров’я, щоб сили примножувалися щодня;</li>
+                <li>Спокою в душі та мирного неба над головою;</li>
+                <li>Щоб кожен ранок починався з усмішки та гарних новин;</li>
+                <li>Уваги та любові від усіх близьких.</li>
+            </ul>
+        </div>
 
-function update() {
-    if (!gameActive) return;
+        <p>Дякую Вам за Вашу мудрість, доброту та щирість, якими Ви так щедро ділитеся з нашою родиною.</p>
 
-    player.dy += GRAVITY;
-    player.y += player.dy;
+        <footer>З великою повагою та любов'ю, Ваша родина!</footer>
+        
+        <a href="#" class="btn" onclick="alert('Бабуся Надія — найкраща! ❤️')">Обійняти віртуально</a>
+    </div>
 
-    if (player.y + player.h >= GROUND_Y) {
-        player.y = GROUND_Y - player.h;
-        player.dy = 0;
-        player.isGrounded = true;
-        player.rotation = player.targetRotation;
-    }
-
-    if (frameCount % Math.floor(spawnRate) === 0) spawnObstacle();
-    frameCount++;
-
-    for (let i = obstacles.length - 1; i >= 0; i--) {
-        let obs = obstacles[i];
-        obs.x -= gameSpeed;
-
-        if (player.x < obs.x + obs.w - 5 &&
-            player.x + player.w > obs.x + 5 &&
-            player.y + player.h > obs.y - obs.h) {
-            gameOver();
-        }
-
-        if (obs.x + obs.w < 0) {
-            obstacles.splice(i, 1);
-            score++;
-            scoreEl.innerText = `Score: ${score}`;
-            updateDifficulty();
-        }
-    }
-}
-
-function draw() {
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, GROUND_Y);
-    ctx.lineTo(canvas.width, GROUND_Y);
-    ctx.stroke();
-
-    obstacles.forEach(obs => {
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = obs.color;
-        ctx.fillStyle = obs.color;
-        ctx.beginPath();
-        ctx.moveTo(obs.x, obs.y);
-        ctx.lineTo(obs.x + obs.w, obs.y);
-        ctx.lineTo(obs.x + obs.w / 2, obs.y - obs.h);
-        ctx.fill();
-    });
-
-    ctx.save();
-    ctx.translate(player.x + player.w / 2, player.y + player.h / 2);
-    if (player.rotation < player.targetRotation) player.rotation += 0.15;
-    ctx.rotate(player.rotation);
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = player.color;
-    ctx.fillStyle = player.color;
-    ctx.fillRect(-player.w / 2, -player.h / 2, player.w, player.h);
-    ctx.restore();
-}
-
-function gameOver() {
-    gameActive = false;
-    restartBtn.style.display = 'block';
-    document.getElementById('msg').innerHTML = `<h2 style='color:#ff0055'>CRASHED ON LEVEL ${level}</h2>`;
-    
-    if (score > highScore) {
-        highScore = score;
-        localStorage.setItem('neonDashHighScore', highScore);
-        highScoreEl.innerText = `Best: ${highScore}`;
-    }
-}
-
-function resetGame() {
-    score = 0;
-    level = 1;
-    gameSpeed = 5;
-    spawnRate = 90;
-    scoreEl.innerText = `Score: 0`;
-    levelEl.innerText = `Level: 1`;
-    obstacles = [];
-    player.y = GROUND_Y - 30;
-    player.dy = 0;
-    player.rotation = 0;
-    player.targetRotation = 0;
-    gameActive = true;
-    restartBtn.style.display = 'none';
-    document.getElementById('msg').innerHTML = "";
-    requestAnimationFrame(gameLoop);
-}
-
-function gameLoop() {
-    update();
-    draw();
-    if (gameActive) requestAnimationFrame(gameLoop);
-}
-
-gameLoop();
-</script>
 </body>
 </html>
 
